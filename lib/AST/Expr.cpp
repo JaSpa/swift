@@ -344,6 +344,7 @@ void Expr::propagateLValueAccessKind(AccessKind accessKind,
     NON_LVALUE_EXPR(ObjCSelector)
     NON_LVALUE_EXPR(ObjCKeyPath)
     NON_LVALUE_EXPR(EnumIsCase)
+    NON_LVALUE_EXPR(MemberFlatten)
 
 #define UNCHECKED_EXPR(KIND, BASE) \
     NON_LVALUE_EXPR(KIND)
@@ -403,6 +404,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   SIMPLE_REFERENCE(MemberRef, getMember);
   SIMPLE_REFERENCE(DynamicMemberRef, getMember);
   SIMPLE_REFERENCE(DynamicSubscript, getMember);
+  PASS_THROUGH_REFERENCE(MemberFlatten, getMember);
 
   PASS_THROUGH_REFERENCE(UnresolvedSpecialize, getSubExpr);
 
@@ -657,6 +659,7 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::Type:
   case ExprKind::OtherConstructorDeclRef:
   case ExprKind::DotSyntaxBaseIgnored:
+  case ExprKind::MemberFlatten:
     return true;
 
   case ExprKind::OverloadedDeclRef: {
@@ -1925,6 +1928,13 @@ ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   while (auto metaTy = type->getAs<MetatypeType>())
     type = metaTy->getInstanceType();
   return type->castTo<ArchetypeType>();
+}
+
+MemberFlattenExpr::MemberFlattenExpr(Expr *Base, SourceLoc DotLoc,
+                                     DeclRefExpr *Member)
+    : Expr(ExprKind::MemberFlatten, /*Implicit=*/false), Base(Base),
+      DotLoc(DotLoc), Member(Member) {
+  setType(Member->getType()->castTo<AnyFunctionType>()->getFlattenedFunction());
 }
 
 ObjCKeyPathExpr::ObjCKeyPathExpr(SourceLoc keywordLoc, SourceLoc lParenLoc,

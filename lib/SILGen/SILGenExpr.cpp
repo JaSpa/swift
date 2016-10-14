@@ -185,6 +185,7 @@ namespace {
     RValue visitDynamicMemberRefExpr(DynamicMemberRefExpr *E, SGFContext C);
     RValue visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E,
                                          SGFContext C);
+    RValue visitMemberFlattenExpr(MemberFlattenExpr *E, SGFContext C);
     RValue visitTupleElementExpr(TupleElementExpr *E, SGFContext C);
     RValue visitSubscriptExpr(SubscriptExpr *E, SGFContext C);
     RValue visitDynamicSubscriptExpr(DynamicSubscriptExpr *E,
@@ -1679,6 +1680,16 @@ RValue RValueEmitter::
 visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *E, SGFContext C) {
   visit(E->getLHS());
   return visit(E->getRHS());
+}
+
+RValue RValueEmitter::visitMemberFlattenExpr(MemberFlattenExpr *E,
+                                             SGFContext C) {
+  visit(E->getBase());
+  SILDeclRef member(E->getMember()->getDecl(), SILDeclRef::Kind::Func,
+                    ResilienceExpansion::Minimal, 1);
+  SILValue memberRef =
+      SGF.emitGlobalFunctionRef(E, member, SGF.getConstantInfo(member));
+  return RValue(SGF, E, ManagedValue::forUnmanaged(memberRef));
 }
 
 RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {

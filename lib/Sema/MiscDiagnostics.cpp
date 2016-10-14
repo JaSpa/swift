@@ -515,6 +515,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
             isa<DotSelfExpr>(ParentExpr) ||               // T.self
             isa<CallExpr>(ParentExpr) ||                  // T()
             isa<MemberRefExpr>(ParentExpr) ||             // T.foo
+            isa<MemberFlattenExpr>(ParentExpr) ||
             isa<UnresolvedMemberExpr>(ParentExpr) ||
             isa<SelfApplyExpr>(ParentExpr) ||             // T.foo()  T()
             isa<UnresolvedDotExpr>(ParentExpr) ||

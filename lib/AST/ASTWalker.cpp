@@ -723,6 +723,19 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;      
   }
 
+  Expr *visitMemberFlattenExpr(MemberFlattenExpr *E) {
+    Expr *Base = doIt(E->getBase());
+    if (!Base)
+      return nullptr;
+    E->setBase(Base);
+
+    DeclRefExpr *Member = cast_or_null<DeclRefExpr>(doIt(E->getMember()));
+    if (!Member)
+      return nullptr;
+    E->setMember(Member);
+    return E;
+  }
+
   Expr *visitExplicitCastExpr(ExplicitCastExpr *E) {
     if (Expr *Sub = E->getSubExpr()) {
       Sub = doIt(Sub);

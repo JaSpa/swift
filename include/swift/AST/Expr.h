@@ -3892,7 +3892,34 @@ public:
     return E->getKind() == ExprKind::DotSyntaxBaseIgnored;
   }
 };
-  
+
+// MemberFlattenExpr - represents an unapplied member function reference.
+class MemberFlattenExpr : public Expr {
+  Expr *Base;
+  SourceLoc DotLoc;
+  DeclRefExpr *Member;
+
+public:
+  MemberFlattenExpr(Expr *Base, SourceLoc DotLoc, DeclRefExpr *Member);
+
+  Expr *getBase() const { return Base; }
+  void setBase(Expr *E) { Base = E; }
+
+  SourceLoc getDotLoc() const { return DotLoc; }
+
+  DeclRefExpr *getMember() const { return Member; }
+  void setMember(DeclRefExpr *E) { Member = E; }
+
+  SourceLoc getStartLoc() const {
+    return DotLoc.isValid() ? Base->getStartLoc() : Member->getStartLoc();
+  }
+  SourceLoc getEndLoc() const { return Member->getEndLoc(); }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::MemberFlatten;
+  }
+};
+
 /// \brief Represents an explicit cast, 'a as T' or 'a is T', where "T" is a
 /// type, and "a" is the expression that will be converted to the type.
 class ExplicitCastExpr : public Expr {

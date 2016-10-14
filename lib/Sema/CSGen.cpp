@@ -1365,6 +1365,10 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
+    Type visitMemberFlattenExpr(MemberFlattenExpr *expr) {
+      llvm_unreachable("Already type-checked");
+    }
+
     Type visitOverloadedDeclRefExpr(OverloadedDeclRefExpr *expr) {
       // For a reference to an overloaded declaration, we create a type variable
       // that will be equal to different types depending on which overload

@@ -2148,6 +2148,13 @@ public:
     printRec(E->getRHS());
     OS << ')';
   }
+  void visitMemberFlattenExpr(MemberFlattenExpr *E) {
+    printCommon(E, "member_flatten") << '\n';
+    printRec(E->getBase());
+    OS << '\n';
+    printRec(E->getMember());
+    OS << ')';
+  }
 
   void printExplicitCastExpr(ExplicitCastExpr *E, const char *name) {
     printCommon(E, name) << ' ';
