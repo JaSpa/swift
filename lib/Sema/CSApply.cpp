@@ -958,28 +958,40 @@ namespace {
                                                    Implicit, semantics);
       declRefExpr->setFunctionRefKind(functionRefKind);
       declRefExpr->setType(refTy);
-      Expr *ref = declRefExpr;
 
-      // If the reference needs to be converted, do so now.
-      if (dynamicSelfFnType) {
-        ref = new (context) CovariantFunctionConversionExpr(ref,
-                                                            dynamicSelfFnType);
-      }
+      // Jump through some hoops so we embed the conversion inside the
+      // enclosing expression (DotSyntaxCallExpr/ConstructorCallExpr/...)
+      // except for MemberFlattenExpr where we want to embed the flattening
+      // inside the conversion
+      auto getRef = [&](Expr *ref) -> Expr * {
+        if (!dynamicSelfFnType)
+          return ref;
+
+        return new (context)
+            CovariantFunctionConversionExpr(ref, dynamicSelfFnType);
+      };
 
       ApplyExpr *apply;
       if (isa<ConstructorDecl>(member)) {
         // FIXME: Provide type annotation.
-        apply = new (context) ConstructorRefCallExpr(ref, base);
+        apply = new (context) ConstructorRefCallExpr(getRef(declRefExpr), base);
       } else if (!baseIsInstance && member->isInstanceMember()) {
-        // Reference to an unbound instance method.
-        Expr *result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
-                                                              ref);
+        Expr *result;
+        if (isa<FuncDecl>(member) && !context.isSwiftVersion3()) {
+          // If not in compatibility mode, flatten member function references.
+          result = new (context) MemberFlattenExpr(base, dotLoc, declRefExpr);
+          result = getRef(result);
+        } else {
+          result = getRef(declRefExpr);
+          result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc, result);
+        }
         closeExistential(result, /*force=*/openedExistential);
         return result;
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
                "can't call a static method on an instance");
-        apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
+        apply =
+            new (context) DotSyntaxCallExpr(getRef(declRefExpr), dotLoc, base);
         if (Implicit) {
           apply->setImplicit();
         }
@@ -2231,6 +2243,10 @@ namespace {
     }
 
     Expr *visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
+      return simplifyExprType(expr);
+    }
+
+    Expr *visitMemberFlattenExpr(MemberFlattenExpr *expr) {
       return simplifyExprType(expr);
     }
 

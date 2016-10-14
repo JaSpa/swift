@@ -774,7 +774,7 @@ void ConstraintSystem::recordOpenedTypes(
 /// Determine how many levels of argument labels should be removed from the
 /// function type when referencing the given declaration.
 static unsigned getNumRemovedArgumentLabels(ASTContext &ctx, ValueDecl *decl,
-                                            bool isCurriedInstanceReference,
+                                            bool isUncurriedInstanceReference,
                                             FunctionRefKind functionRefKind) {
   // Only applicable to functions. Nothing else should have argument labels in
   // the type.
@@ -792,11 +792,18 @@ static unsigned getNumRemovedArgumentLabels(ASTContext &ctx, ValueDecl *decl,
     // If we have fewer than two parameter lists, leave the labels.
     if (func->getNumParameterLists() < 2) return 0;
 
+    // If we have a single apply to an uncurried function it is like a single
+    // apply to a one argument function - don't strip the arguments.
+    if (isUncurriedInstanceReference && !ctx.isSwiftVersion3())
+      return func->getNumParameterLists() - 2;
+
+    // In Swift 3 context `isUncurriedInstanceReference` is more like
+    // `isCurriedInstanceReference`.
     // If this is a curried reference to an instance method, where 'self' is
     // being applied, e.g., "ClassName.instanceMethod(self)", remove the
     // argument labels from the resulting function type. The 'self' parameter is
     // always unlabeled, so this operation is a no-op for the actual application.
-    return isCurriedInstanceReference ? func->getNumParameterLists() : 1;
+    return isUncurriedInstanceReference ? func->getNumParameterLists() : 1;
 
   case FunctionRefKind::DoubleApply:
     // Never remove argument labels from a double application.
@@ -1219,10 +1226,9 @@ ConstraintSystem::getTypeOfMemberReference(
   auto isClassBoundExistential = false;
   llvm::DenseMap<CanType, TypeVariableType *> localReplacements;
   auto &replacements = replacementsPtr ? *replacementsPtr : localReplacements;
-  bool isCurriedInstanceReference = value->isInstanceMember() && !isInstance;
-  unsigned numRemovedArgumentLabels =
-    getNumRemovedArgumentLabels(TC.Context, value, isCurriedInstanceReference,
-                                functionRefKind);
+  bool isUncurriedInstanceReference = value->isInstanceMember() && !isInstance;
+  unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
+      TC.Context, value, isUncurriedInstanceReference, functionRefKind);
 
   if (auto genericFn = value->getInterfaceType()->getAs<GenericFunctionType>()){
     openedType = openFunctionType(genericFn, numRemovedArgumentLabels,
@@ -1397,6 +1403,9 @@ ConstraintSystem::getTypeOfMemberReference(
     // parameter with the base type.
     type = openedFnType->replaceSelfParameterType(baseObjTy);
   }
+
+  if (isUncurriedInstanceReference && !TC.Context.isSwiftVersion3())
+    type = type->castTo<AnyFunctionType>()->getFlattenedFunction();
 
   // If we opened up any type variables, record the replacements.
   recordOpenedTypes(locator, replacements);
