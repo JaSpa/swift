@@ -2871,6 +2871,40 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
   return properties;
 }
 
+std::pair<Type, AnyFunctionType::ExtInfo>
+AnyFunctionType::destructure(SmallVectorImpl<TupleTypeElt> &inputs,
+                             int uncurryLevel, bool desugar) {
+
+  AnyFunctionType *fnType = this;
+  ExtInfo extInfo = getExtInfo();
+
+  while (true) {
+    if (desugar) {
+      // Don't desugare to much so we don't split single tuple arguments into
+      // multiple single arguments:
+      // (A) -> (B, C) -> D     => (A, B, C) -> D
+      // (A) -> ((B, C)) -> D   => (A, (B, C)) -> D
+      if (auto tuple = dyn_cast<TupleType>(fnType->getInput().getPointer())) {
+        inputs.append(tuple->getElements().begin(), tuple->getElements().end());
+      } else {
+        inputs.push_back(fnType->getInput()->getWithoutParens());
+      }
+    } else {
+      inputs.push_back(fnType->getInput());
+    }
+
+    if (fnType->getExtInfo().throws())
+      extInfo = extInfo.withThrows();
+
+    if (uncurryLevel-- == 0)
+      break;
+
+    fnType = fnType->getResult()->castTo<AnyFunctionType>();
+  }
+
+  return {fnType->getResult(), extInfo};
+}
+
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   if (isa<FunctionType>(this))
     return FunctionType::get(getInput(), getResult(), info);

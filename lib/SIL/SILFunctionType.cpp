@@ -2427,32 +2427,9 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
   assert(rep != SILFunctionType::Representation::Block
          && "objc blocks cannot be curried");
 
-  // The dependent generic signature.
-  CanGenericSignature genericSig;
-  if (auto gft = dyn_cast<GenericFunctionType>(fnType)) {
-    genericSig = gft.getGenericSignature();
-  }
-
-  // The uncurried input types.
   SmallVector<TupleTypeElt, 4> inputs;
-
-  // Merge inputs and generic parameters from the uncurry levels.
-  for (;;) {
-    inputs.push_back(TupleTypeElt(fnType->getInput()));
-
-    assert(!isa<PolymorphicFunctionType>(fnType));
-
-    // The uncurried function calls all of the intermediate function
-    // levels and so throws if any of them do.
-    if (fnType->getExtInfo().throws())
-      extInfo = extInfo.withThrows();
-
-    if (uncurryLevel-- == 0)
-      break;
-    fnType = cast<AnyFunctionType>(fnType.getResult());
-  }
-
-  CanType resultType = fnType.getResult();
+  auto flatInfo = fnType->destructure(inputs, uncurryLevel, /*desugar=*/false);
+  CanType resultType(flatInfo.first);
   bool suppressOptionalResult =
     bridgingFnPattern.hasForeignErrorStrippingResultOptionality();
 
@@ -2525,13 +2502,12 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
 
   // Put the inputs in the order expected by the calling convention.
   std::reverse(inputs.begin(), inputs.end());
+  CanType inputType = TupleType::get(inputs, Context)->getCanonicalType();
 
   // Create the new function type.
-  CanType inputType = TupleType::get(inputs, Context)->getCanonicalType();
-  if (genericSig) {
-    return CanGenericFunctionType::get(genericSig,
-                                       inputType, resultType, extInfo);
-  } else {
-    return CanFunctionType::get(inputType, resultType, extInfo);
-  }
+  if (auto gft = dyn_cast<GenericFunctionType>(fnType))
+    return CanGenericFunctionType::get(gft.getGenericSignature(), inputType,
+                                       resultType, flatInfo.second);
+
+  return CanFunctionType::get(inputType, resultType, flatInfo.second);
 }

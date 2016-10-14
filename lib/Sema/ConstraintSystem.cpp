@@ -594,24 +594,16 @@ Type ConstraintSystem::openType(
 static Type removeArgumentLabels(Type type, unsigned numArgumentLabels) {
   // If there is nothing to remove, don't.
   if (numArgumentLabels == 0) return type;
-  
-  auto fnType = type->getAs<FunctionType>();
 
-  // Drop argument labels from the input type.
-  Type inputType = fnType->getInput();
-  if (auto tupleTy = dyn_cast<TupleType>(inputType.getPointer())) {
-    SmallVector<TupleTypeElt, 4> elements;
-    elements.reserve(tupleTy->getNumElements());
-    for (const auto &elt : tupleTy->getElements()) {
-      elements.push_back(elt.getWithoutName());
-    }
-    inputType = TupleType::get(elements, type->getASTContext());
-  }
+  SmallVector<TupleTypeElt, 4> elements;
+  auto fnInfo = type->castTo<FunctionType>()->destructure(elements);
 
-  return FunctionType::get(inputType,
-                           removeArgumentLabels(fnType->getResult(),
-                                                numArgumentLabels - 1),
-                           fnType->getExtInfo());
+  for (auto it = elements.begin(); it < elements.end(); ++it)
+    *it = it->getWithoutName();
+
+  auto inputType = TupleType::get(elements, type->getASTContext());
+  auto resultType = removeArgumentLabels(fnInfo.first, numArgumentLabels - 1);
+  return FunctionType::get(inputType, resultType, fnInfo.second);
 }
 
 Type ConstraintSystem::openFunctionType(

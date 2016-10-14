@@ -2392,6 +2392,10 @@ public:
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
 
+  std::pair<Type, ExtInfo> destructure(SmallVectorImpl<TupleTypeElt> &inputs,
+                                       int uncurryLevel = 0,
+                                       bool desugar = true);
+
   ExtInfo getExtInfo() const {
     return ExtInfo(AnyFunctionTypeBits.ExtInfo);
   }
