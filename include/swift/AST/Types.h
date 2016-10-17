@@ -2392,6 +2392,8 @@ public:
   Type getInput() const { return Input; }
   Type getResult() const { return Output; }
 
+  AnyFunctionType *getFlattenedFunction();
+
   std::pair<Type, ExtInfo> destructure(SmallVectorImpl<TupleTypeElt> &inputs,
                                        int uncurryLevel = 0,
                                        bool desugar = true);

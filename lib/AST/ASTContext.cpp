@@ -2871,6 +2871,18 @@ getGenericFunctionRecursiveProperties(Type Input, Type Result) {
   return properties;
 }
 
+AnyFunctionType *AnyFunctionType::getFlattenedFunction() {
+  SmallVector<TupleTypeElt, 4> inputs;
+  auto flattenInfo = destructure(inputs, /*uncurryLevel=*/1);
+  auto inputType = TupleType::get(inputs, getASTContext());
+
+  if (auto gft = getAs<GenericFunctionType>())
+    return GenericFunctionType::get(gft->getGenericSignature(), inputType,
+                                    flattenInfo.first, flattenInfo.second);
+
+  return FunctionType::get(inputType, flattenInfo.first, flattenInfo.second);
+}
+
 std::pair<Type, AnyFunctionType::ExtInfo>
 AnyFunctionType::destructure(SmallVectorImpl<TupleTypeElt> &inputs,
                              int uncurryLevel, bool desugar) {
